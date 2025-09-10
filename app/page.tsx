@@ -281,10 +281,12 @@ export default function FootballRotationTracker() {
 
   const assignInitialLineup = (side?: "offense" | "defense") => {
     const currentSide = side || gameState.currentSide
-    const sortedPlayers = getPlayersByPlayTime()
     const positions = currentSide === "offense" ? OFFENSE_POSITIONS : DEFENSE_POSITIONS
     const newLineup: Record<string, string> = {}
     const newPlayers = [...players]
+
+    // Keep track of who was playing before we clear the lineup
+    const previouslyPlayingPlayers = newPlayers.filter(player => player.isPlaying).map(player => player.name)
 
     newPlayers.forEach((player) => {
       player.isPlaying = false
@@ -301,7 +303,22 @@ export default function FootballRotationTracker() {
     }
 
     const remainingPositions = positions.filter((pos) => pos !== "QB" || currentSide === "defense")
-    const availablePlayers = sortedPlayers.filter((p) => p.name !== selectedQuarterback || currentSide === "defense")
+    
+    // Prioritize players who were NOT on the field previously when switching sides
+    const availablePlayers = [...players]
+      .filter((p) => p.name !== selectedQuarterback || currentSide === "defense")
+      .sort((a, b) => {
+        // First priority: players who were NOT playing previously
+        const aWasPlaying = previouslyPlayingPlayers.includes(a.name)
+        const bWasPlaying = previouslyPlayingPlayers.includes(b.name)
+        
+        if (aWasPlaying !== bWasPlaying) {
+          return aWasPlaying ? 1 : -1 // Non-playing players first
+        }
+        
+        // Second priority: players with less play time
+        return a.playTime - b.playTime
+      })
 
     remainingPositions.forEach((position, index) => {
       if (availablePlayers[index]) {
